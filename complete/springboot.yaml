@@ -1,0 +1,125 @@
+---
+apiVersion: v1
+items:
+kind: List
+metadata: {}
+items:
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      app: bogije-gs-securing-web
+      chart: bogije-gs-securing-web-0.0.1
+      heritage: Tiller
+      release: bogije-gs-securing-web
+    name: bogije-gs-securing-web
+    namespace: __PROJECT__
+  spec:
+    replicas: 1
+    selector:
+      deploymentconfig: bogije-gs-securing-web
+    template:
+      metadata:
+        labels:
+          app: bogije-gs-securing-web
+          release: bogije-gs-securing-web
+          deploymentconfig: bogije-gs-securing-web
+          version: v1
+      spec:
+        imagePullSecrets:
+        - name: docker-registry-credentials
+        containers:
+          - name: bogije-gs-securing-web
+            image: "__IMAGE_TAG__"
+            imagePullPolicy: "Always"
+            ports:
+              - name: http
+                containerPort: 8080
+                protocol: TCP
+            livenessProbe:
+              tcpSocket:
+                port: http
+              initialDelaySeconds: 600
+              timeoutSeconds: 60
+            readinessProbe:
+              tcpSocket:
+                port: http
+            resources:
+              {}
+
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: bogije-gs-securing-web
+      chart: bogije-gs-securing-web-0.0.1
+      heritage: Tiller
+      release: bogije-gs-securing-web
+      version: v1
+    name: bogije-gs-securing-web
+    namespace: __PROJECT__
+  spec:
+    type: "ClusterIP"
+    ports:
+      - name: http
+        port: 80
+        protocol: TCP
+        targetPort: 8080
+    selector:
+      app: bogije-gs-securing-web
+      release: bogije-gs-securing-web
+
+- apiVersion: extensions/v1beta1
+  kind: Ingress
+  metadata:
+    annotations:
+      haproxy.router.openshift.io/timeout: 11m
+    labels:
+      app: __PROJECT__-bogije-gs-securing-web
+    name: __PROJECT__-bogije-gs-securing-web
+    namespace: istio-system
+  spec:
+    tls:
+    - hosts:
+      - "bogije-gs-securing-web.__PROJECT__.vaughn.perspectatechdemos.com"
+      secretName: "vaughn-perspectatechdemos-com-crt"
+    rules:
+    - host: bogije-gs-securing-web.__PROJECT__.vaughn.perspectatechdemos.com
+      http:
+        paths:
+        - path: /
+          backend:
+            serviceName: istio-ingressgateway
+            servicePort: 80
+
+- apiVersion: networking.istio.io/v1alpha3
+  kind: VirtualService
+  metadata:
+    name: bogije-gs-securing-web
+    namespace: __PROJECT__
+  spec:
+    hosts:
+    - "bogije-gs-securing-web.__PROJECT__.vaughn.perspectatechdemos.com"
+    gateways:
+    - __PROJECT__-istio-gateway
+    http:
+    - match:
+      - uri:
+          prefix: /
+      route:
+      - destination:
+          host: bogije-gs-securing-web
+          port:
+            number: 80
+
+- apiVersion: networking.istio.io/v1alpha3
+  kind: DestinationRule
+  metadata:
+    name: bogije-gs-securing-web
+    namespace: __PROJECT__
+  spec:
+    host: bogije-gs-securing-web
+    subsets:
+    - name: v1
+      labels:
+        version: v1            
